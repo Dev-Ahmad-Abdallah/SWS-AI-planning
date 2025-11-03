@@ -1,0 +1,2 @@
+scenario,planner,t_goal,path_len,min_clear,replans,cpu_ms,success,efficiency
+S7,prm,63.26199999999975,16.99039688582302,0.22584722144713779,3,74.86303647359212,0,0.0

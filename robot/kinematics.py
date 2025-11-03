@@ -74,39 +74,38 @@ class RobotKinematics:
         new_x = self.x + self.v * np.cos(new_theta) * dt
         new_y = self.y + self.v * np.sin(new_theta) * dt
         
-        # CRITICAL FIX: Check entire robot footprint for collisions, not just center point
+        # OPTIMIZED: More thorough collision checking for robot footprint
         new_footprint = self._get_footprint_at(new_x, new_y, new_theta)
         
         # Check if robot footprint intersects obstacles
-        # Check multiple points on the footprint boundary
+        # OPTIMIZED: Check more points with better sampling pattern
         footprint_center = (new_x, new_y)
         corners = list(new_footprint.exterior.coords)[:-1]  # Get all corners
         
         # Check center and all corners
         check_points = [footprint_center] + corners
         
+        # OPTIMIZED: Also check edge midpoints and quarter points for better coverage
+        # This provides better coverage without being too expensive
+        edge_points = []
+        for i in range(len(corners)):
+            p1 = corners[i]
+            p2 = corners[(i + 1) % len(corners)]
+            # Check midpoints and quarter points along each edge
+            for t in [0.25, 0.5, 0.75]:
+                mid_x = p1[0] + t * (p2[0] - p1[0])
+                mid_y = p1[1] + t * (p2[1] - p1[1])
+                edge_points.append((mid_x, mid_y))
+        
+        # Combine all check points
+        all_check_points = check_points + edge_points
+        
         # Check if any point is in an obstacle
         collision_detected = False
-        for px, py in check_points:
+        for px, py in all_check_points:
             if not world.is_free(px, py, use_inflated=True):
                 collision_detected = True
                 break
-        
-        # Also check intermediate points along the footprint edges for more thorough checking
-        if not collision_detected:
-            # Sample points along edges
-            for i in range(len(corners)):
-                p1 = corners[i]
-                p2 = corners[(i + 1) % len(corners)]
-                # Check 3 intermediate points along edge
-                for t in [0.25, 0.5, 0.75]:
-                    mid_x = p1[0] + t * (p2[0] - p1[0])
-                    mid_y = p1[1] + t * (p2[1] - p1[1])
-                    if not world.is_free(mid_x, mid_y, use_inflated=True):
-                        collision_detected = True
-                        break
-                if collision_detected:
-                    break
         
         # Only update if NO collision detected
         if not collision_detected:

@@ -386,15 +386,32 @@ class SimulationEngine:
             lidar_ranges = self.last_lidar_ranges if hasattr(self, 'last_lidar_ranges') else []
             min_clearance = self.last_min_clearance if hasattr(self, 'last_min_clearance') else float('inf')
         
-        # Check for re-planning triggers - CRITICAL FIX: More aggressive to avoid getting stuck
-        # Don't trigger replan just because clearance is low if we're making progress
-        if min_clearance < self.config['replan']['threshold_clearance']:
-            # Only replan if clearance is REALLY low AND we haven't planned recently
-            if (min_clearance < self.config['local_avoid']['min_clearance'] * 0.6 and 
-                self.sim_time - self.last_plan_time > self.replan_interval):
+        # OPTIMIZED: More aggressive replanning triggers to prevent getting stuck
+        # Check multiple conditions for replanning
+        clearance_low = min_clearance < self.config['replan']['threshold_clearance']
+        clearance_dangerous = min_clearance < self.config['local_avoid']['min_clearance'] * 0.6
+        time_since_last_plan = self.sim_time - self.last_plan_time
+        
+        # Check if DWA thinks we should replan
+        dwa_should_replan = False
+        if self.current_path:
+            progress = self._compute_progress()
+            dwa_should_replan = self.local_avoider.should_replan(progress, min_clearance)
+        
+        # Trigger replan if:
+        # 1. Clearance is dangerously low (immediate replan)
+        # 2. Clearance is low AND we haven't replanned recently AND DWA suggests replan
+        # 3. DWA thinks we should replan AND enough time has passed
+        if clearance_dangerous:
+            if time_since_last_plan > self.replan_interval * 0.5:  # Allow faster replan when dangerous
                 self.needs_replan = True
+        elif clearance_low and dwa_should_replan:
+            if time_since_last_plan > self.replan_interval:
+                self.needs_replan = True
+        elif dwa_should_replan and time_since_last_plan > self.replan_interval:
+            self.needs_replan = True
         else:
-            # Clear replan flag if clearance is good
+            # Clear replan flag if clearance is good and we're making progress
             if min_clearance > self.config['replan']['threshold_clearance'] * 1.5:
                 self.needs_replan = False
         
@@ -469,17 +486,28 @@ class SimulationEngine:
                     )
         
         # Execute local avoidance (optimized for 60 FPS - reduced samples)
+        # CRITICAL FIX: Force immediate backward movement if clearance is dangerously low
+        emergency_clearance = 0.3  # Emergency threshold - immediate backward
+        if min_clearance < emergency_clearance:
+            # EMERGENCY: Immediate fast backward movement
+            v = -self.config['robot']['v_max'] * 0.8  # Fast backward movement (increased from 0.3)
+            omega = self.config['robot']['omega_max'] * 0.3  # Turn slightly while backing up
+            self.last_v = v
+            self.last_omega = omega
         # CRITICAL FIX: If in WAIT state (deadlock recovery), force backward movement
-        if self.task_fsm.state.name == 'WAIT' if hasattr(self.task_fsm.state, 'name') else False:
+        elif self.task_fsm.state.name == 'WAIT' if hasattr(self.task_fsm.state, 'name') else False:
             # Force backward movement to get unstuck during deadlock recovery
-            v = -self.config['robot']['v_max'] * 0.3  # Slow backward movement
+            v = -self.config['robot']['v_max'] * 0.6  # Faster backward movement (increased from 0.3)
             omega = 0.0  # Straight back
+            self.last_v = v
+            self.last_omega = omega
         elif self.current_path and len(self.current_path) > 0:
             next_waypoint = self.current_path[min(self.current_waypoint_idx, len(self.current_path) - 1)]
+            # Pass actor polygons for dynamic obstacle avoidance
             v, omega = self.local_avoider.compute(
                 self.robot.x, self.robot.y, self.robot.theta,
                 next_waypoint[0], next_waypoint[1],
-                lidar_ranges, min_clearance
+                lidar_ranges, min_clearance, self._cached_actor_polygons
             )
             
             # FALLBACK: If DWA returns zero, use simple direct movement towards waypoint
@@ -527,12 +555,32 @@ class SimulationEngine:
             self.last_v = 0.0
             self.last_omega = 0.0
         
-        # Check if blocked (progress threshold) - check every frame for responsiveness
+        # OPTIMIZED: Better progress monitoring for replanning
         if self.current_path:
             progress = self._compute_progress()
-            if progress < self.config['replan']['threshold_progress']:
-                if self.sim_time - self.last_plan_time > self.replan_interval:
-                    self.needs_replan = True
+            # Check if progress is too low (blocked or stuck)
+            progress_stuck = progress < self.config['replan']['threshold_progress']
+            
+            # Also check if we're not moving towards goal
+            if progress_stuck and goal is not None:
+                # Check if we're actually making progress towards goal
+                current_dist = np.sqrt(
+                    (self.robot.x - goal[0])**2 + (self.robot.y - goal[1])**2
+                )
+                time_since_last_plan = self.sim_time - self.last_plan_time
+                if hasattr(self, '_last_progress_check_dist'):
+                    # If distance to goal hasn't decreased significantly, we're stuck
+                    dist_reduction = self._last_progress_check_dist - current_dist
+                    if dist_reduction < 0.1 and time_since_last_plan > self.replan_interval * 0.7:
+                        self.needs_replan = True
+                    self._last_progress_check_dist = current_dist
+                else:
+                    self._last_progress_check_dist = current_dist
+            
+            # Original progress check
+            time_since_last_plan = self.sim_time - self.last_plan_time
+            if progress_stuck and time_since_last_plan > self.replan_interval:
+                self.needs_replan = True
         
         # Update robot kinematics - FORCE MOVEMENT
         self.robot.update(v, omega, dt, self.world)

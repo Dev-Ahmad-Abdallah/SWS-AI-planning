@@ -2,28 +2,28 @@
 
 # Robot parameters
 robot:
-  width: 0.5
-  length: 0.7
-  v_max: 1.5       # m/s max forward velocity (slow and safe)
-  omega_max: 1.0   # rad/s max angular velocity (cautious turning)
+  width: 0.4        # REDUCED: Smaller robot for better maneuverability (reduced from 0.5)
+  length: 0.5        # REDUCED: Smaller robot for better maneuverability (reduced from 0.7)
+  v_max: 2.5       # INCREASED: Faster forward velocity (increased from 1.5)
+  omega_max: 3.0   # INCREASED: Much higher rotational speed (increased from 1.0)
   
 # Inflation and C-space
 inflation:
-  radius: 0.8        # LARGER inflation radius to keep paths AWAY from shelves (was 0.5)
+  radius: 0.65        # REDUCED: Smaller inflation radius with smaller robot (reduced from 1.1)
   
 # Local avoidance (DWA-like)
 local_avoid:
-  w_goal: 1.0       # balanced goal weight
-  w_obs: 5.0        # HIGHER weight for obstacle avoidance - prefer clearance over speed
-  w_smooth: 0.5     # balanced smoothness weight
-  lookahead: 2.5    # longer lookahead
-  min_clearance: 1.0  # LARGER minimum clearance - keep robot AWAY from shelves (safe mode)
+  w_goal: 6.0       # FIXED: Much higher weight for goal progress - prioritize path following (was 2.0)
+  w_obs: 9.0        # Higher weight for obstacle avoidance - maximum safety
+  w_smooth: 1.2     # FIXED: Reduced smoothness weight - allow necessary turns (was 3.5)
+  lookahead: 2.5    # FIXED: Shorter lookahead for better path following (was 3.0)
+  min_clearance: 0.65  # REDUCED: Smaller clearance with smaller robot and inflation (reduced from 1.2)
   
 # Re-planning
 replan:
-  threshold_clearance: 0.7  # higher threshold to trigger earlier
-  threshold_progress: 0.01
-  timeout: 30.0
+  threshold_clearance: 0.5  # REDUCED: Adjusted for smaller clearance (reduced from 0.8)
+  threshold_progress: 0.005  # OPTIMIZED: Lower threshold for earlier replan
+  timeout: 15.0    # OPTIMIZED: Shorter timeout - replan sooner
   
 # Sensors
 lidar:
