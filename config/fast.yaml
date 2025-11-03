@@ -1,0 +1,45 @@
+# Fast configuration - smaller inflation, faster speeds, lower obstacle weights
+
+# Robot parameters
+robot:
+  width: 0.5
+  length: 0.7
+  v_max: 25.0       # ultra-fast max velocity (15x speed for maximum efficiency)
+  omega_max: 20.0   # ultra-fast angular velocity (15x speed for rapid turns)
+  
+# Inflation and C-space
+inflation:
+  radius: 0.7       # LARGER inflation radius to keep paths AWAY from shelves (was 0.2)
+  
+# Local avoidance (DWA-like)
+local_avoid:
+  w_goal: 1.0       # balanced goal weight
+  w_obs: 5.0        # HIGHER obstacle weight - prefer clearance over speed
+  w_smooth: 0.5     # balanced smoothness weight
+  lookahead: 2.0    # longer lookahead for better clearance
+  min_clearance: 0.5  # LARGER minimum clearance - keep distance from obstacles (was 0.15)
+  
+# Re-planning
+replan:
+  threshold_clearance: 0.1   # lower threshold
+  threshold_progress: 0.01
+  timeout: 30.0
+  
+# Sensors
+lidar:
+  fov: 360
+  resolution: 1.0
+  max_range: 4.0     # shorter range
+  update_rate: 20
+  
+# Simulation
+sim:
+  fps: 60
+  dt: 0.01667
+  window_width: 1280
+  window_height: 720
+  grid_resolution: 0.5  # Larger cells for clearer 2D grid (0.5m per cell)
+  
+# RNG seed
+seed: 42
+

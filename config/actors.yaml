@@ -1,0 +1,92 @@
+# Dynamic actor configuration per scenario
+
+S1:
+  # Nominal - no dynamic actors
+  actors: []
+  seed: 42
+
+S2:
+  # Crossing Actor - one actor crosses path
+  actors:
+    - type: human
+      count: 1
+      speed_range: [0.5, 0.8]
+      behavior: crossing
+      spawn_pos: [10.0, 5.0]  # approximate position
+  seed: 123
+
+S3:
+  # Blocked Aisle - actor blocks planned path
+  actors:
+    - type: forklift
+      count: 1
+      speed_range: [0.3, 0.5]
+      behavior: block_aisle
+      spawn_pos: [8.0, 6.0]
+  seed: 456
+
+S4:
+  # Congestion - multiple actors
+  actors:
+    - type: human
+      count: 3
+      speed_range: [0.4, 0.7]
+      behavior: random_walk
+    - type: forklift
+      count: 2
+      speed_range: [0.3, 0.6]
+      behavior: lane_follow
+  seed: 789
+
+S5:
+  # Crowded - very high traffic
+  actors:
+    - type: human
+      count: 8
+      speed_range: [0.5, 0.8]
+      behavior: random_walk
+    - type: forklift
+      count: 5
+      speed_range: [0.4, 0.7]
+      behavior: lane_follow
+  seed: 999
+
+S6:
+  # Multi-Robot - multiple robots (handled separately)
+  actors:
+    - type: human
+      count: 2
+      speed_range: [0.4, 0.6]
+      behavior: random_walk
+    - type: forklift
+      count: 1
+      speed_range: [0.3, 0.5]
+      behavior: lane_follow
+  seed: 111
+  num_robots: 3  # Number of robots in multi-robot scenario
+
+S7:
+  # Emergency - dynamic obstacles moving fast
+  actors:
+    - type: human
+      count: 4
+      speed_range: [1.0, 1.5]  # Faster movement
+      behavior: random_walk
+    - type: forklift
+      count: 3
+      speed_range: [0.8, 1.2]  # Faster movement
+      behavior: lane_follow
+  seed: 222
+
+# Actor properties
+actor_types:
+  human:
+    width: 0.4
+    length: 0.4
+    color: [100, 200, 255]  # light blue
+    
+  forklift:
+    width: 0.6
+    length: 1.0
+    color: [255, 150, 50]  # orange
+

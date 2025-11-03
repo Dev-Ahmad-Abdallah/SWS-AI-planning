@@ -1,0 +1,98 @@
+# Project: Smart Warehouse Robot (CW1)
+# Goal: Build a simulated warehouse robot that navigates aisles, handles dynamic obstacles,
+#       compares at least two global planning approaches, logs KPIs, and delivers code+report+slides.
+
+## Tech & OS assumptions
+- OS: Any OS that supports Python 3.10 (macOS, Linux, Windows)
+- Stack: Pygame 2.5+ for 2D simulation
+- Python 3.10; pure Python (no C++ required)
+- Package management: pip + requirements.txt
+- Plotting: matplotlib >= 3.8
+- No external network calls during runtime (deterministic sim)
+
+## Non-negotiables (tie to grading & module ILOs)
+- Discrete planning + configuration-space representation + a random/sampling-based planner
+- Dynamic obstacle handling + re-planning trigger
+- Comparative evaluation (A* vs PRM/RRT*) with logged KPIs
+- Clear documentation (README, diagrams, module docs), reproducible runs from clean clone
+
+## Directory expectations (AI should respect)
+sim/                    # engine.py, world.py, actors.py
+robot/                  # kinematics.py, sensors.py
+nav/                    # a_star.py, prm.py, local_dwa.py, task_fsm.py, maps.py
+tools/                  # logger.py, metrics.py, plots.py
+config/                 # baseline.yaml, safe.yaml, fast.yaml, actors.yaml
+docs/                   # overview, architecture, modules
+data/logs/              # CSV log files per run
+videos/                  # Recorded simulation demos
+
+## Commands & scripts (AI must keep these working)
+- Setup: `python -m venv .venv && source .venv/bin/activate && pip install -U pip && pip install -r requirements.txt`
+- Nominal run: `python run.py --scenario S1 --planner a_star`
+- Dynamic run: `python run.py --scenario S2 --planner a_star`
+- Blocked aisle: `python run.py --scenario S3 --planner prm`
+- Congestion: `python run.py --scenario S4 --planner a_star`
+- Plots: `python tools/plots.py --in data/logs/*.csv --out docs/img/`
+
+## Coding standards
+- Python: black, isort, flake8; type hints where feasible
+- Logging: CSV per run with headers: scenario, planner, t_goal, path_len, min_clear, replans, cpu_ms, success, efficiency
+- All modules must have: brief, inputs, outputs, params (docstring or header comment)
+
+## Test-first rule
+- For each feature, create a minimal test or smoke scenario before implementation.
+- Example: add Scenario S3 (blocked aisle) before adding re-planning hook.
+
+## Don't do
+- Don't hardcode machine-specific paths
+- Don't push large binaries (videos) without git-lfs pointers
+- Don't modify docs/assignment language (keep academic tone in report)
+
+## Tasks the AI should complete (in order)
+1) Repo bootstrap:
+   - Create `run.py` entry point with CLI arguments (--scenario, --planner)
+   - Create `sim/engine.py`: Pygame main loop (60 FPS), rendering layers
+   - Create `sim/world.py`: Grid/tile map loader, occupancy grid, inflation via Minkowski sum
+   - Create `sim/actors.py`: Dynamic obstacle spawner with seeded RNG
+   - Create `robot/kinematics.py`: Diff-drive/unicycle model with speed limits
+   - Create `robot/sensors.py`: 2D LiDAR raycast, min-clearance monitor
+
+2) Planning stack:
+   - Implement `nav/a_star.py`: grid-based A* (inflated occupancy), return path + stats
+   - Implement `nav/prm.py` OR `nav/rrt_star.py`: sampling planner
+   - Implement `nav/local_dwa.py`: DWA-like local avoidance with velocity sampling
+   - Implement `nav/task_fsm.py`: sequence bays → inspect/pick (mock) → dock; with recovery states (wait/turn/alt-aisle)
+   - Implement `nav/maps.py`: Map utilities, shortest-path baseline
+
+3) Dynamic obstacles:
+   - `sim/actors.py`: configurable N actors via YAML; random seeds; speed ranges
+   - Re-planning trigger: on "blocked" or "clearance<τ" trigger global re-plan
+
+4) Logging & evaluation:
+   - `tools/logger.py`: write CSV per run with KPIs
+   - `tools/metrics.py`: compute efficiency = path_len / shortest_len, success, min_clear
+   - `tools/plots.py`: generate comparison chart (A* vs PRM/RRT*), ablation plots
+
+5) Configs:
+   - `config/baseline.yaml`, `config/safe.yaml`, `config/fast.yaml` with inflation radius, lookahead, speed, obstacle cost weights
+   - `config/actors.yaml`: actor spawn parameters per scenario
+
+6) Docs:
+   - Fill `docs/overview.md`, `docs/architecture.md`, `docs/modules/*.md`, `docs/checklists.md`
+   - README: one-command run, scenario list (S1–S4), what to expect, troubleshooting
+
+## Acceptance checks (AI must verify)
+- S1 (nominal) runs end-to-end with zero collisions
+- S2 (crossing actor) avoids collision without deadlock
+- S3 (blocked aisle) triggers re-plan and reaches goal
+- S4 (congestion) shows safe waits and progress
+- CSV logs exist; plots render; README instructions work on fresh clone
+- Pygame runs at stable 60 FPS; ESC quits; 'r' restarts; 'v' toggles video capture
+
+## Commit style
+- Conventional commits (feat:, fix:, docs:, chore:, test:)
+- Each feature commit includes a short demo gif or log snippet where possible
+
+## Writing style (docs)
+- Short paragraphs, figures with takeaways
+- Include a small table mapping outcomes → module ILOs in the report

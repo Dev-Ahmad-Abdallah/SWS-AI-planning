@@ -1,0 +1,331 @@
+{
+  "project": "Smart Warehouse Robot (CW1) — Pygame Edition",
+  "version": 1,
+  "mission": [
+    "Build a 2D Pygame warehouse simulator with a mobile robot that navigates aisles and safely handles dynamic obstacles (must demonstrate re-planning).",
+    "Implement & compare two global planners: discrete A* and a random/sampling method (PRM or RRT*).",
+    "Log KPIs and present a concise comparative study with scope & limitations mapped to module ILOs."
+  ],
+  "deliverables": [
+    "Functional Pygame simulation showing dynamic-obstacle handling (record short videos).",
+    "Well-documented Python source code (comments on main components & functionality).",
+    "Technical report (template): intro/objectives, design/algorithms, implementation, challenges/solutions, testing & results.",
+    "Presentation (template) summarising approach and showcasing simulation runs."
+  ],
+  "module_alignment": {
+    "ilos": [
+      "Recognise fundamental concepts in AI planning for robot systems.",
+      "Rationalise scope & limitations; critically assess algorithms/representations.",
+      "Build theoretical & practical models/representations.",
+      "Plan, develop, evaluate and report individual work."
+    ],
+    "content_focus": [
+      "Discrete planning",
+      "Geometric representation",
+      "Configuration-space",
+      "Random algorithms (PRM/RRT*)"
+    ]
+  },
+  "environment": {
+    "python": "3.10",
+    "deps": [
+      "pygame>=2.5",
+      "numpy>=1.26",
+      "scipy>=1.11",
+      "networkx>=3.2",
+      "shapely>=2.0",
+      "matplotlib>=3.8"
+    ]
+  },
+  "commands": {
+    "setup": "python -m venv .venv && source .venv/bin/activate && pip install -U pip && pip install -r requirements.txt",
+    "run_nominal": "python run.py --scenario S1 --planner a_star",
+    "run_dynamic": "python run.py --scenario S2 --planner a_star",
+    "run_blocked": "python run.py --scenario S3 --planner prm",
+    "run_congestion": "python run.py --scenario S4 --planner a_star",
+    "plots": "python tools/plots.py --in data/logs/*.csv --out docs/img/"
+  },
+  "directory_layout": [
+    "README.md",
+    "requirements.txt",
+    "run.py",
+    "sim/engine.py",
+    "sim/world.py",
+    "sim/actors.py",
+    "robot/kinematics.py",
+    "robot/sensors.py",
+    "nav/a_star.py",
+    "nav/prm.py",
+    "nav/local_dwa.py",
+    "nav/task_fsm.py",
+    "nav/maps.py",
+    "config/baseline.yaml",
+    "config/safe.yaml",
+    "config/fast.yaml",
+    "config/actors.yaml",
+    "data/logs/.gitkeep",
+    "tools/logger.py",
+    "tools/metrics.py",
+    "tools/plots.py",
+    "docs/overview.md",
+    "docs/architecture.md",
+    "docs/modules/world_robot.md",
+    "docs/modules/navigation.md",
+    "docs/modules/testing_eval.md",
+    "videos/"
+  ],
+  "critical_rules": [
+    "R1: Fresh-clone reproducibility — one command per scenario runs without manual tweaks.",
+    "R2: No absolute paths; all assets loaded via project-relative paths.",
+    "R3: Provide TWO global planners (A* + PRM/RRT*) and a CLI flag `--planner` to switch.",
+    "R4: Implement dynamic-obstacle avoidance + a re-plan trigger when blocked (min-clearance/blocked flag).",
+    "R5: Log KPIs for EVERY run to CSV with the schema below and generate plots without notebooks.",
+    "R6: Deterministic runs — RNG seeds in config; scenario params in YAML.",
+    "R7: Each module has a top-of-file docstring: purpose, inputs, outputs, params.",
+    "R8: Report must map outcomes to ILOs and include a brief critical comparison.",
+    "R9: Figures must have takeaway captions; presentation must show S1–S4 clips.",
+    "R10: Exceed the brief with at least one original touch (e.g., congestion-aware aisle heuristic or param ablation dashboard)."
+  ],
+  "features": [
+    {
+      "id": "core_engine",
+      "name": "Core Pygame Engine",
+      "desc": "60 FPS loop; dt integration; layers for world, robot, actors, HUD.",
+      "todos": [
+        "Initialize window; deterministic timestep; camera panning; pause/record toggles.",
+        "HUD: scenario name, planner, live KPIs."
+      ],
+      "files": [
+        "sim/engine.py",
+        "run.py"
+      ],
+      "accept": [
+        "Stable 60 FPS; ESC quits; 'r' restarts; 'v' toggles video capture."
+      ]
+    },
+    {
+      "id": "world_grid",
+      "name": "Grid World & Inflation",
+      "desc": "Tile map with shelves/aisles/dock; occupancy + inflated obstacles (C-space).",
+      "todos": [
+        "Load ASCII/PNG layout into numpy grid.",
+        "Compute inflation via Minkowski sum (shapely) using robot footprint.",
+        "Compute shortest-path baseline on free grid for efficiency metric."
+      ],
+      "files": [
+        "sim/world.py",
+        "nav/maps.py",
+        "config/baseline.yaml"
+      ],
+      "accept": [
+        "Inflated obstacles visible; robot footprint respected."
+      ]
+    },
+    {
+      "id": "robot_model",
+      "name": "Kinematics & Footprint",
+      "desc": "Unicycle/diff-drive model; PID speed control; rectangular footprint.",
+      "todos": [
+        "Integrate state with dt; clamp v and ω.",
+        "Collision checks via shapely polygon vs inflated grid."
+      ],
+      "files": [
+        "robot/kinematics.py"
+      ],
+      "accept": [
+        "Robot respects max v/ω; no tunnelling through walls."
+      ]
+    },
+    {
+      "id": "sensors",
+      "name": "LiDAR Raycast + Clearance",
+      "desc": "2D lidar beams (fov, resolution, range); min-clearance monitor to trigger re-plan.",
+      "todos": [
+        "Raycast vs world polygons; return ranges.",
+        "Compute min distance to obstacles at 10–20 Hz."
+      ],
+      "files": [
+        "robot/sensors.py"
+      ],
+      "accept": [
+        "Ranges plausible; min-clearance updates at target rate."
+      ]
+    },
+    {
+      "id": "planner_a_star",
+      "name": "Global Planner: A*",
+      "desc": "Grid A* with consistent heuristic; tie-breaks; optional path smoothing.",
+      "todos": [
+        "Heuristic = octile; early-exit; reconstruct path.",
+        "Line-of-sight smoothing where feasible."
+      ],
+      "files": [
+        "nav/a_star.py"
+      ],
+      "accept": [
+        "Path found on inflated grid; path length and runtime recorded."
+      ]
+    },
+    {
+      "id": "planner_prm",
+      "name": "Global Planner: PRM (or RRT*)",
+      "desc": "Sampling-based roadmap; k-NN; collision-checked edges.",
+      "todos": [
+        "Sample N free points; connect k neighbors; Dijkstra over graph.",
+        "Edge collision checks against inflated obstacles."
+      ],
+      "files": [
+        "nav/prm.py"
+      ],
+      "accept": [
+        "Finds paths in tougher layouts; KPIs logged."
+      ]
+    },
+    {
+      "id": "local_avoid",
+      "name": "Local Avoidance: DWA-like",
+      "desc": "Sample velocity commands; simulate short horizon; choose safe, goal-aligned command.",
+      "todos": [
+        "Score = w_goal*progress - w_obs*(1/min_clear) - w_smooth*Δu.",
+        "Trigger global re-plan if blocked or progress < threshold."
+      ],
+      "files": [
+        "nav/local_dwa.py"
+      ],
+      "accept": [
+        "S2 crossing: no collision; S3: re-plan fires and succeeds."
+      ]
+    },
+    {
+      "id": "task_fsm",
+      "name": "Task Executive (FSM)",
+      "desc": "Sequence GoTo(bay) → Inspect (mock) → Dock; with recovery states.",
+      "todos": [
+        "Implement state graph with timeouts.",
+        "Deadlock detection; alternate-aisle selection."
+      ],
+      "files": [
+        "nav/task_fsm.py"
+      ],
+      "accept": [
+        "S1 completes end-to-end without collision."
+      ]
+    },
+    {
+      "id": "actors",
+      "name": "Dynamic Actors",
+      "desc": "Humans/forklifts with lane-follow or random walk; seeded trajectories.",
+      "todos": [
+        "Spawn count/speed in YAML; avoid walls; optional crossing-events.",
+        "Deterministic RNG seeds per scenario."
+      ],
+      "files": [
+        "sim/actors.py",
+        "config/actors.yaml",
+        "run.py"
+      ],
+      "accept": [
+        "Configurable density via YAML; behavior consistent with seed."
+      ]
+    },
+    {
+      "id": "logging_metrics",
+      "name": "Logging & Metrics",
+      "desc": "CSV logger + KPI calculator.",
+      "todos": [
+        "Write CSV per run using defined schema.",
+        "Compute efficiency = path_len/shortest_len."
+      ],
+      "files": [
+        "tools/logger.py",
+        "tools/metrics.py",
+        "data/logs/.gitkeep"
+      ],
+      "accept": [
+        "CSV per scenario in data/logs/ with all fields populated."
+      ]
+    },
+    {
+      "id": "plotting",
+      "name": "Plots (Comparison & Ablation)",
+      "desc": "Matplotlib charts: A* vs PRM; inflation/param ablation.",
+      "todos": [
+        "Generate PNGs for report & slides into docs/img/."
+      ],
+      "files": [
+        "tools/plots.py"
+      ],
+      "accept": [
+        "Figures render from CSVs; legible axes/titles."
+      ]
+    },
+    {
+      "id": "docs",
+      "name": "Docs, Report & Slides",
+      "desc": "README quickstart; module docs; report & slides per template.",
+      "todos": [
+        "Map outcomes → ILOs in report.",
+        "Add scenario clips to slides; captions with takeaways."
+      ],
+      "files": [
+        "docs/overview.md",
+        "docs/architecture.md",
+        "docs/modules/world_robot.md",
+        "docs/modules/navigation.md",
+        "docs/modules/testing_eval.md"
+      ],
+      "accept": [
+        "Clear, error-free narrative; ILO table present; demo clips included."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "S1",
+      "name": "Nominal",
+      "expect": "No movers; visit bays; return dock; zero collisions."
+    },
+    {
+      "id": "S2",
+      "name": "Crossing Actor",
+      "expect": "Local avoidance; maintain clearance; success."
+    },
+    {
+      "id": "S3",
+      "name": "Blocked Aisle → Re-plan",
+      "expect": "Re-plan triggers; route around blockage; success."
+    },
+    {
+      "id": "S4",
+      "name": "Congestion",
+      "expect": "Wait-and-go; safe progress; success ratio logged."
+    }
+  ],
+  "kpis": {
+    "csv_schema": [
+      "scenario",
+      "planner",
+      "t_goal",
+      "path_len",
+      "min_clear",
+      "replans",
+      "cpu_ms",
+      "success",
+      "efficiency"
+    ],
+    "notes": {
+      "t_goal": "seconds to finish mission",
+      "path_len": "total travel distance (px or m)",
+      "min_clear": "minimum obstacle clearance (px or m)",
+      "replans": "count of global re-plans",
+      "cpu_ms": "compute time for planning (milliseconds)",
+      "success": "1 if mission completed without collision, else 0",
+      "efficiency": "path_len / shortest_len"
+    }
+  },
+  "acceptance_gates": [
+    "All four deliverables complete and aligned to the brief (sim, code, report, presentation).",
+    "Explicit ILO coverage (concepts, assessment, build, report) and discussion of scope & limits.",
+    "First-Class qualities: fulfills/exceeds brief; rigorous; clear theory→practice; wide reading; critical evaluation; originality; clear communication."
+  ]
+}

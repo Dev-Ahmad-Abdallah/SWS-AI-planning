@@ -1,0 +1,2 @@
+scenario,planner,t_goal,path_len,min_clear,replans,cpu_ms,success,efficiency
+S4,dijkstra,33.71699999999993,17.458839691332713,0.30326529420364173,96,1.5474086006482441,0,0.0

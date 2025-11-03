@@ -1,0 +1,2 @@
+scenario,planner,t_goal,path_len,min_clear,replans,cpu_ms,success,efficiency
+S1,a_star,151.72399999999257,16.930116263352133,0.3060911596228109,413,0.3611042770866043,0,0.0
