@@ -4,8 +4,8 @@
 robot:
   width: 0.5        # meters (or pixels)
   length: 0.7        # meters (or pixels)
-  v_max: 15.0       # m/s max forward velocity (10-15x faster for rapid warehouse operations)
-  omega_max: 12.0   # rad/s max angular velocity (10-15x faster for agile navigation)
+  v_max: 2.0       # m/s max forward velocity (realistic warehouse speed)
+  omega_max: 1.5   # rad/s max angular velocity (smooth turning)
   
 # Inflation and C-space
 inflation:
@@ -17,20 +17,20 @@ local_avoid:
   w_obs: 5.0        # HIGHER weight for obstacle avoidance - prefer clearance over speed
   w_smooth: 0.5     # weight for smoothness
   lookahead: 2.0    # prediction horizon
-  min_clearance: 0.5  # LARGER minimum clearance - keep distance from obstacles (was 0.2)
+  min_clearance: 0.8  # LARGER minimum clearance - keep robot AWAY from shelves (was 0.5)
   
 # Re-planning
 replan:
-  threshold_clearance: 0.15  # clearance < this triggers re-plan
+  threshold_clearance: 0.6  # clearance < this triggers re-plan (increased to trigger earlier)
   threshold_progress: 0.01    # progress < this triggers re-plan
   timeout: 30.0              # max time without progress before re-plan
   
 # Sensors
 lidar:
   fov: 360          # field of view in degrees (360 = full circle)
-  resolution: 3.0   # degrees per beam (reduced for performance)
+  resolution: 1.5   # degrees per beam (240 beams - good balance of detail and performance)
   max_range: 8.0    # maximum range in meters/pixels (longer range for warehouse)
-  update_rate: 15   # Hz (reduced update rate)
+  update_rate: 20   # Hz (good update rate)
   
 # Simulation
 sim:

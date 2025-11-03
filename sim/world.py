@@ -83,17 +83,25 @@ class World:
         
         # Realistic warehouse dimensions
         # Aisle width: ~3-4m (for forklifts), shelf depth: ~1.2m, shelf height: ~8-10m
-        aisle_width_cells = int(3.5 / self.grid_resolution)  # Wider aisles for forklifts
+        # Note: aisle_width_cells will be zone-specific (defined below)
         shelf_depth_cells = int(1.2 / self.grid_resolution)
         shelf_height_cells = int(8.0 / self.grid_resolution)
         
         # Create organized storage zones with multiple aisles
-        # Zone 1: High-density storage (left side)
-        # Zone 2: Medium storage (middle)
-        # Zone 3: Fast-moving goods (right side)
+        # Zone 1: High-density storage (left side) - more shelves, narrower aisles
+        # Zone 2: Medium storage (middle) - standard layout
+        # Zone 3: Fast-moving goods (right side) - wider aisles for faster access
         
         num_zones = 3
         zone_width = self.grid_width // num_zones
+        
+        # CRITICAL FIX: Make crowded scenarios more realistic by varying aisle widths
+        # Different zones have different aisle widths for more realistic warehouse layout
+        zone_aisle_widths = [
+            int(3.0 / self.grid_resolution),  # Zone 1: Narrower (3m) - more crowded
+            int(3.5 / self.grid_resolution),  # Zone 2: Standard (3.5m)
+            int(4.0 / self.grid_resolution),   # Zone 3: Wider (4m) - less crowded
+        ]
         
         for zone in range(num_zones):
             zone_start_x = zone * zone_width
@@ -102,30 +110,57 @@ class World:
             # Number of aisles per zone (3-4 aisles)
             num_aisles = 4 if zone == 1 else 3  # Middle zone has more aisles
             
+            # Use zone-specific aisle width
+            current_aisle_width_cells = zone_aisle_widths[zone]
+            
             for aisle_num in range(num_aisles):
                 # Calculate aisle position within zone
                 aisle_spacing = (zone_end_x - zone_start_x) / (num_aisles + 1)
                 aisle_x = int(zone_start_x + (aisle_num + 1) * aisle_spacing)
                 
                 # REALISTIC WAREHOUSE: Create shelf rows on left side of aisle (type 2 = shelf)
-                shelf_left = max(1, aisle_x - shelf_depth_cells - aisle_width_cells // 2)
-                shelf_right = max(1, aisle_x - aisle_width_cells // 2)
+                # CRITICAL FIX: Make shelves more realistic - variable heights and gaps
+                shelf_left = max(1, aisle_x - shelf_depth_cells - current_aisle_width_cells // 2)
+                shelf_right = max(1, aisle_x - current_aisle_width_cells // 2)
                 shelf_top = int(0.20 * self.grid_height)  # Leave space for top cross-corridor
                 shelf_bottom = int(0.78 * self.grid_height)  # Leave space for dock area
-                # Only place shelves if there's room
+                
+                # Create more realistic shelves with gaps for cross-aisles and breaks
                 if shelf_bottom > shelf_top and shelf_right > shelf_left:
-                    grid[shelf_top:shelf_bottom, shelf_left:shelf_right] = 2  # Shelf type
+                    # Add vertical gaps every few meters for cross-aisles (more realistic)
+                    gap_spacing = int(8.0 / self.grid_resolution)  # Gap every ~8m
+                    for shelf_y in range(shelf_top, shelf_bottom, gap_spacing + int(2.0 / self.grid_resolution)):
+                        shelf_end_y = min(shelf_bottom, shelf_y + int(3.0 / self.grid_resolution))
+                        if shelf_end_y > shelf_y:
+                            grid[shelf_y:shelf_end_y, shelf_left:shelf_right] = 2  # Shelf type
+                    
+                    # Also add some breaks in shelves for more realistic warehouse layout
+                    if aisle_num % 2 == 0:  # Alternate aisles have breaks
+                        break_y = shelf_top + int((shelf_bottom - shelf_top) * 0.3)
+                        break_height = int(2.0 / self.grid_resolution)
+                        grid[break_y:break_y+break_height, shelf_left:shelf_right] = 0  # Break in shelf
                 
                 # REALISTIC WAREHOUSE: Create shelf rows on right side of aisle
-                shelf_left = min(self.grid_width - 1, aisle_x + aisle_width_cells // 2)
-                shelf_right = min(self.grid_width - 1, aisle_x + aisle_width_cells // 2 + shelf_depth_cells)
+                shelf_left = min(self.grid_width - 1, aisle_x + current_aisle_width_cells // 2)
+                shelf_right = min(self.grid_width - 1, aisle_x + current_aisle_width_cells // 2 + shelf_depth_cells)
                 # Only place shelves if there's room
                 if shelf_bottom > shelf_top and shelf_right > shelf_left:
-                    grid[shelf_top:shelf_bottom, shelf_left:shelf_right] = 2  # Shelf type
+                    # Add vertical gaps every few meters for cross-aisles (more realistic)
+                    gap_spacing = int(8.0 / self.grid_resolution)  # Gap every ~8m
+                    for shelf_y in range(shelf_top, shelf_bottom, gap_spacing + int(2.0 / self.grid_resolution)):
+                        shelf_end_y = min(shelf_bottom, shelf_y + int(3.0 / self.grid_resolution))
+                        if shelf_end_y > shelf_y:
+                            grid[shelf_y:shelf_end_y, shelf_left:shelf_right] = 2  # Shelf type
+                    
+                    # Also add some breaks in shelves for more realistic warehouse layout
+                    if aisle_num % 2 == 1:  # Alternate aisles have breaks on opposite side
+                        break_y = shelf_top + int((shelf_bottom - shelf_top) * 0.5)
+                        break_height = int(2.0 / self.grid_resolution)
+                        grid[break_y:break_y+break_height, shelf_left:shelf_right] = 0  # Break in shelf
                 
                 # CRITICAL: Ensure aisle itself is FREE (type 3 = aisle) - walkable path between shelves
-                aisle_left = max(0, aisle_x - aisle_width_cells // 2)
-                aisle_right = min(self.grid_width, aisle_x + aisle_width_cells // 2)
+                aisle_left = max(0, aisle_x - current_aisle_width_cells // 2)
+                aisle_right = min(self.grid_width, aisle_x + current_aisle_width_cells // 2)
                 # Force aisle to be free (overwrite any shelves)
                 for y in range(shelf_top, shelf_bottom):
                     for x in range(aisle_left, aisle_right):

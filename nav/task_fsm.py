@@ -256,15 +256,23 @@ class TaskFSM:
             self._recover_from_deadlock()
     
     def _recover_from_deadlock(self):
-        """Recover from deadlock."""
-        # Try alternate aisle or wait
+        """Recover from deadlock - CRITICAL FIX: Actually recover, don't just wait."""
+        # Clear the last position to reset stuck detection
+        self.last_position = None
+        
+        # Try alternate aisle or wait - but also signal robot to back up
         if self.state in [TaskState.GOTO_BAY, TaskState.GOTO_PICKUP, TaskState.GOTO_DELIVERY]:
+            # Try backing up first by waiting briefly, then resume
             self.state = TaskState.WAIT
             self.wait_start_time = 0.0
+            self.wait_timeout = 3.0  # Shorter wait to recover faster
+            print("Task: Deadlock recovery - backing up and waiting briefly")
         elif self.state == TaskState.GOTO_DOCK:
+            # Try turning in place to find new angle
             self.state = TaskState.TURN_IN_PLACE
         
         self.stuck_time = 0.0
+        self.stuck_threshold = 12.0  # Reset threshold slightly higher to prevent immediate re-trigger
     
     def get_current_goal(self):
         """Get current goal waypoint."""

@@ -4,8 +4,8 @@
 robot:
   width: 0.5
   length: 0.7
-  v_max: 25.0       # ultra-fast max velocity (15x speed for maximum efficiency)
-  omega_max: 20.0   # ultra-fast angular velocity (15x speed for rapid turns)
+  v_max: 2.5       # m/s max forward velocity (faster but still realistic)
+  omega_max: 2.0   # rad/s max angular velocity (smooth turning)
   
 # Inflation and C-space
 inflation:
@@ -17,20 +17,20 @@ local_avoid:
   w_obs: 5.0        # HIGHER obstacle weight - prefer clearance over speed
   w_smooth: 0.5     # balanced smoothness weight
   lookahead: 2.0    # longer lookahead for better clearance
-  min_clearance: 0.5  # LARGER minimum clearance - keep distance from obstacles (was 0.15)
+  min_clearance: 0.8  # LARGER minimum clearance - keep robot AWAY from shelves
   
 # Re-planning
 replan:
-  threshold_clearance: 0.1   # lower threshold
+  threshold_clearance: 0.6   # increased threshold to trigger earlier
   threshold_progress: 0.01
   timeout: 30.0
   
 # Sensors
 lidar:
   fov: 360
-  resolution: 1.0
-  max_range: 4.0     # shorter range
-  update_rate: 20
+  resolution: 1.5   # degrees per beam (240 beams - good balance)
+  max_range: 6.0    # good range for warehouse
+  update_rate: 25   # higher update rate for faster config
   
 # Simulation
 sim:

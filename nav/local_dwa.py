@@ -78,7 +78,8 @@ class LocalDWA:
             (v, omega): Velocity command tuple
         """
         # CRITICAL FIX: Check if robot is stuck (very low clearance) - prefer backward movement
-        is_stuck = min_clearance < self.min_clearance * 0.8
+        # Increased threshold to trigger earlier when getting close to obstacles
+        is_stuck = min_clearance < self.min_clearance * 1.0  # Trigger when clearance is below minimum
         # Sample velocity space
         best_v = 0.0
         best_omega = 0.0
@@ -217,17 +218,28 @@ class LocalDWA:
         else:
             obstacle_cost = 500.0  # Very high penalty for zero clearance
         
-        # Smoothness cost: change in velocity command
-        dv = abs(v - self.last_v)
-        domega = abs(omega - self.last_omega)
+        # Smoothness cost: change in velocity command (normalized)
+        # CRITICAL FIX: Normalize to prevent penalizing high-speed movements
+        dv = abs(v - self.last_v) / (self.v_max + 0.01)  # Normalize by max velocity
+        domega = abs(omega - self.last_omega) / (self.omega_max + 0.01)  # Normalize by max angular velocity
         smoothness_cost = dv + domega
         
-        # Combined score with backward movement bonus
+        # CRITICAL FIX: Bonus for maintaining or increasing speed (encourages faster movement)
+        speed_bonus = 0.0
+        if v > 0.1:  # Moving forward
+            # Bonus for maintaining speed or accelerating
+            if v >= abs(self.last_v) * 0.9:  # Maintaining or increasing speed
+                speed_bonus = 2.0 * (v / self.v_max)  # Reward based on speed fraction
+        elif v < -0.1:  # Moving backward (when stuck)
+            speed_bonus = 1.0  # Small bonus for backward movement when needed
+        
+        # Combined score with backward movement bonus and speed bonus
         score = (
             self.w_goal * progress -
             self.w_obs * obstacle_cost -
             self.w_smooth * smoothness_cost +
-            backward_bonus  # Add bonus for backward movement when stuck
+            backward_bonus +  # Add bonus for backward movement when stuck
+            speed_bonus  # Add bonus for maintaining/gaining speed
         )
         
         return score

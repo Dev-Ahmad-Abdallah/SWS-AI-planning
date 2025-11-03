@@ -281,8 +281,9 @@ class SimulationEngine:
         self.current_waypoint_idx = 0
         self.needs_replan = False
         self.last_plan_time = 0.0
-        self.replan_interval = 1.0  # Minimum time between re-plans
+        self.replan_interval = 2.0  # Minimum time between re-plans (increased to prevent excessive replans)
         self._last_goal = None  # Track last goal to prevent unnecessary replanning
+        self._last_plan_dist_to_goal = None  # Track distance to goal at last plan
         
         # Cache for sensors
         self.last_lidar_ranges = []
@@ -385,9 +386,12 @@ class SimulationEngine:
             lidar_ranges = self.last_lidar_ranges if hasattr(self, 'last_lidar_ranges') else []
             min_clearance = self.last_min_clearance if hasattr(self, 'last_min_clearance') else float('inf')
         
-        # Check for re-planning triggers (less aggressive)
+        # Check for re-planning triggers - CRITICAL FIX: More aggressive to avoid getting stuck
+        # Don't trigger replan just because clearance is low if we're making progress
         if min_clearance < self.config['replan']['threshold_clearance']:
-            if self.sim_time - self.last_plan_time > self.replan_interval:
+            # Only replan if clearance is REALLY low AND we haven't planned recently
+            if (min_clearance < self.config['local_avoid']['min_clearance'] * 0.6 and 
+                self.sim_time - self.last_plan_time > self.replan_interval):
                 self.needs_replan = True
         else:
             # Clear replan flag if clearance is good
@@ -422,26 +426,55 @@ class SimulationEngine:
                 # State changed but goal is the same (e.g., reached waypoint in path) - don't replan
                 self.needs_replan = False
         
-        # Check if we need to plan (faster re-planning for realistic behavior)
-        # CRITICAL FIX: Don't replan if we're very close to the goal (within 0.6m)
+        # Check if we need to plan - CRITICAL FIX: Prevent excessive replanning
         goal = self.task_fsm.get_current_goal()
         at_goal = False
+        moving_towards_goal = False
+        
         if goal is not None:
             dist_to_goal = np.sqrt(
                 (self.robot.x - goal[0])**2 + (self.robot.y - goal[1])**2
             )
-            at_goal = dist_to_goal < 0.6  # Close enough to goal
+            at_goal = dist_to_goal < 0.8  # Close enough to goal (increased threshold)
+            
+            # Check if we're making progress towards goal (prevent replan when moving)
+            if self.current_path is not None and len(self.current_path) > 0:
+                # If we have a path and it leads to goal, check if we're following it
+                last_waypoint = self.current_path[-1]
+                waypoint_dist_to_goal = np.sqrt(
+                    (last_waypoint[0] - goal[0])**2 + (last_waypoint[1] - goal[1])**2
+                )
+                # If path ends near goal and we're moving, don't replan
+                if waypoint_dist_to_goal < 1.0:
+                    # Check if we moved closer to goal since last plan
+                    if hasattr(self, '_last_plan_dist_to_goal'):
+                        if dist_to_goal < self._last_plan_dist_to_goal * 1.1:  # Getting closer or same
+                            moving_towards_goal = True
+                    else:
+                        self._last_plan_dist_to_goal = dist_to_goal
+                        moving_towards_goal = True
         
         # IMPORTANT: Plan immediately on first frame if no path exists or state changed
-        # BUT: Don't replan if we're already at the goal point
-        if (self.current_path is None or self.needs_replan) and not at_goal:
+        # BUT: Don't replan if we're already at the goal or making progress towards it
+        should_replan = (self.current_path is None or self.needs_replan) and not at_goal and not moving_towards_goal
+        
+        if should_replan:
             if self.sim_time - self.last_plan_time > self.replan_interval or self.current_path is None:
                 self._plan_path()
                 self.needs_replan = False
                 self.last_plan_time = self.sim_time
+                if goal is not None:
+                    self._last_plan_dist_to_goal = np.sqrt(
+                        (self.robot.x - goal[0])**2 + (self.robot.y - goal[1])**2
+                    )
         
         # Execute local avoidance (optimized for 60 FPS - reduced samples)
-        if self.current_path and len(self.current_path) > 0:
+        # CRITICAL FIX: If in WAIT state (deadlock recovery), force backward movement
+        if self.task_fsm.state.name == 'WAIT' if hasattr(self.task_fsm.state, 'name') else False:
+            # Force backward movement to get unstuck during deadlock recovery
+            v = -self.config['robot']['v_max'] * 0.3  # Slow backward movement
+            omega = 0.0  # Straight back
+        elif self.current_path and len(self.current_path) > 0:
             next_waypoint = self.current_path[min(self.current_waypoint_idx, len(self.current_path) - 1)]
             v, omega = self.local_avoider.compute(
                 self.robot.x, self.robot.y, self.robot.theta,

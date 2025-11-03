@@ -4,8 +4,8 @@
 robot:
   width: 0.5
   length: 0.7
-  v_max: 10.0       # m/s (10x faster while maintaining safety margins)
-  omega_max: 8.0    # rad/s (10x faster turning)
+  v_max: 1.5       # m/s max forward velocity (slow and safe)
+  omega_max: 1.0   # rad/s max angular velocity (cautious turning)
   
 # Inflation and C-space
 inflation:
@@ -17,18 +17,18 @@ local_avoid:
   w_obs: 5.0        # HIGHER weight for obstacle avoidance - prefer clearance over speed
   w_smooth: 0.5     # balanced smoothness weight
   lookahead: 2.5    # longer lookahead
-  min_clearance: 0.5  # LARGER minimum clearance - keep distance from obstacles (was 0.3)
+  min_clearance: 1.0  # LARGER minimum clearance - keep robot AWAY from shelves (safe mode)
   
 # Re-planning
 replan:
-  threshold_clearance: 0.25  # higher threshold
+  threshold_clearance: 0.7  # higher threshold to trigger earlier
   threshold_progress: 0.01
   timeout: 30.0
   
 # Sensors
 lidar:
   fov: 360
-  resolution: 1.0
+  resolution: 1.5   # degrees per beam (240 beams - good balance)
   max_range: 6.0    # longer range
   update_rate: 20
   

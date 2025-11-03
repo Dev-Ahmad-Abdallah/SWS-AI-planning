@@ -1,0 +1,2 @@
+scenario,planner,t_goal,path_len,min_clear,replans,cpu_ms,success,efficiency
+S1,bfs,155.87700000000183,22.101950420531928,0.43572648501871486,1,14.850854873657227,0,0.0
