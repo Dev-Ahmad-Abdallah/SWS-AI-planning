@@ -54,9 +54,9 @@ class LocalDWA:
         self.min_clearance = min_clearance
         self.world = world  # Store world object for collision checking
         
-        # Velocity sampling resolution (high resolution for realistic navigation)
-        self.v_samples = 15  # High resolution for smooth navigation
-        self.omega_samples = 15  # High resolution (225 samples total for quality)
+        # Velocity sampling resolution (optimized for smooth and fast navigation)
+        self.v_samples = 20  # Increased for smoother velocity transitions
+        self.omega_samples = 20  # Increased for smoother turning (400 samples total)
         
         # Previous command for smoothness
         self.last_v = 0.0
@@ -77,6 +77,8 @@ class LocalDWA:
         Returns:
             (v, omega): Velocity command tuple
         """
+        # CRITICAL FIX: Check if robot is stuck (very low clearance) - prefer backward movement
+        is_stuck = min_clearance < self.min_clearance * 0.8
         # Sample velocity space
         best_v = 0.0
         best_omega = 0.0
@@ -105,7 +107,7 @@ class LocalDWA:
                 
                 # Score trajectory
                 score = self._score_trajectory(
-                    trajectory, goal_x, goal_y, min_clearance, v, omega
+                    trajectory, goal_x, goal_y, min_clearance, v, omega, is_stuck
                 )
                 
                 if score > best_score:
@@ -166,7 +168,7 @@ class LocalDWA:
         # This is a safety net - kinematics will also check
         return True
     
-    def _score_trajectory(self, trajectory, goal_x, goal_y, min_clearance, v, omega):
+    def _score_trajectory(self, trajectory, goal_x, goal_y, min_clearance, v, omega, is_stuck=False):
         """
         Score trajectory: w_goal*progress - w_obs*(1/min_clear) - w_smooth*Δu.
         
@@ -175,10 +177,20 @@ class LocalDWA:
             goal_x, goal_y: Goal waypoint
             min_clearance: Minimum clearance
             v, omega: Velocity command
+            is_stuck: Whether robot is stuck (needs backward movement)
         
         Returns:
             Trajectory score
         """
+        # CRITICAL FIX: If stuck, heavily favor backward movement to get unstuck
+        if is_stuck and v < 0:
+            # Strong bonus for backward movement when stuck
+            backward_bonus = 50.0
+        elif is_stuck and v > 0:
+            # Penalty for forward movement when stuck
+            backward_bonus = -20.0
+        else:
+            backward_bonus = 0.0
         # Goal progress: distance reduction
         if len(trajectory) > 1:
             # Handle both (x, y) and (x, y, theta) tuple formats
@@ -210,11 +222,12 @@ class LocalDWA:
         domega = abs(omega - self.last_omega)
         smoothness_cost = dv + domega
         
-        # Combined score
+        # Combined score with backward movement bonus
         score = (
             self.w_goal * progress -
             self.w_obs * obstacle_cost -
-            self.w_smooth * smoothness_cost
+            self.w_smooth * smoothness_cost +
+            backward_bonus  # Add bonus for backward movement when stuck
         )
         
         return score
